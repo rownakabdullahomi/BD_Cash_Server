@@ -2,6 +2,7 @@ const express = require("express");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
 import { Request, Response } from "express";
+import { ObjectId } from "mongodb";
 
 const cors = require("cors");
 const app = express();
@@ -28,7 +29,9 @@ async function run() {
     // await client.connect();
 
     const userCollection = client.db("bd_cash").collection("users");
-    const transactionCollection = client.db("bd_cash").collection("transactions");
+    const transactionCollection = client
+      .db("bd_cash")
+      .collection("transactions");
 
     // Users APIs
     app.post("/users", async (req: Request, res: Response) => {
@@ -45,12 +48,56 @@ async function run() {
       }
     });
 
+    // get a specific user role
+    app.get("/user/role/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const query = { email };
+      const result = await userCollection.findOne(query);
+      res.send(result);
+    });
+
     app.post("/add-money-request", async (req: Request, res: Response) => {
       const result = await transactionCollection.insertOne(req.body);
       res.send(result);
     });
     app.post("/pay-money-request", async (req: Request, res: Response) => {
       const result = await transactionCollection.insertOne(req.body);
+      res.send(result);
+    });
+
+    // get all transactions
+    app.get("/transactions", async (req: Request, res: Response) => {
+      const result = await transactionCollection.find().toArray();
+      res.send(result);
+    });
+    // get a transaction by id
+    app.get("/transaction/:id", async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await transactionCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.patch("/transaction/:id", async (req: Request, res: Response) => {
+      const id = req.params.id;
+      const { requestAmount, transactionType, currentBalance, status } = req.body;
+      const query = { _id: new ObjectId(id) };
+      
+     
+    // Define the base update operation
+    const updateDoc: {
+      $set: { status: string };
+      $inc?: { currentBalance: number };
+    } = {
+      $set: { status }
+    };
+      if (transactionType === "Add Money") {
+        updateDoc.$inc = { currentBalance: parseFloat(requestAmount) };
+      }
+      if (transactionType === "Pay Money") {
+        updateDoc.$inc = { currentBalance: -parseFloat(requestAmount) };
+      }
+      const result = await transactionCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
