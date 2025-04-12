@@ -1,18 +1,33 @@
+require("dotenv").config();
 const express = require("express");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
-import { Request, Response } from "express";
+import { Request, Response, NextFunction  } from "express";
 import { ObjectId } from "mongodb";
 
 const cors = require("cors");
+import jwt, { VerifyErrors } from "jsonwebtoken";
+const cookieParser = require('cookie-parser');
+
 const app = express();
-require("dotenv").config();
+
 const port = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
+const corsOptions = {
+  origin: [
+      'http://localhost:5173',
+      
+      ],
+  credentials: true,
+  optionalSuccessStatus: 200,
+}
 
-const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_Pass}@cluster0.d3h8n.mongodb.net/?appName=Cluster0`;
+//  Middleware
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(cookieParser());
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.d3h8n.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -23,15 +38,72 @@ const client = new MongoClient(uri, {
   },
 });
 
+
+// verifyToken
+const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.cookies?.token
+  // console.log(token);
+  if (!token) return res.status(401).send({ message: 'unauthorized access' })
+  jwt.verify(token, process.env.SECRET_KEY as string, (err: VerifyErrors | null, decoded: any) => {
+      if (err) {
+          return res.status(401).send({ message: 'unauthorized access' })
+      }
+      (req as Request & { user?: any }).user = decoded;
+  })
+  next()
+}
+
+
+
+
+
+
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
     const userCollection = client.db("bd_cash").collection("users");
-    const transactionCollection = client
-      .db("bd_cash")
-      .collection("transactions");
+    const transactionCollection = client.db("bd_cash").collection("transactions");
+
+
+      // Generate jwt
+      app.post('/jwt', async (req: Request, res: Response) => {
+        const email = req.body
+        // create token
+        const token = jwt.sign(email, process.env.SECRET_KEY as string, {
+            expiresIn: '5d',
+        })
+        // console.log(token)
+        // res.send(token)
+        res
+            .cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            })
+            .send({ success: true })
+    })
+
+    // Remove cookie from browser when logout
+    app.get('/logout', async (req: Request, res: Response) => {
+        res
+            .clearCookie('token', {
+                maxAge: 0,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            })
+            .send({ success: true })
+    })
+
+
+
+
+
+
+
+
 
     // Users APIs
     app.post("/users", async (req: Request, res: Response) => {
