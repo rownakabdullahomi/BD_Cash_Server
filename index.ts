@@ -49,6 +49,10 @@ async function run() {
       const result = await transactionCollection.insertOne(req.body);
       res.send(result);
     });
+    app.post("/pay-money-request", async (req: Request, res: Response) => {
+      const result = await transactionCollection.insertOne(req.body);
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
