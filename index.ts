@@ -77,26 +77,46 @@ async function run() {
       const result = await transactionCollection.findOne(query);
       res.send(result);
     });
+    // get the latest transaction by email
+    app.get("/latest/transaction/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const query = { createdBy : email };
+      const result = await transactionCollection.findOne(query, {
+        sort: { _id: -1 }, // or `_id: -1` 
+      });
+      res.send(result);
+    });
 
     app.patch("/transaction/:id", async (req: Request, res: Response) => {
       const id = req.params.id;
-      const { requestAmount, transactionType, currentBalance, status } = req.body;
+      const { requestAmount, transactionType, currentBalance, totalAdded, totalPaid, status } = req.body;
       const query = { _id: new ObjectId(id) };
       
      
     // Define the base update operation
     const updateDoc: {
       $set: { status: string };
-      $inc?: { currentBalance: number };
+      $inc: {
+        currentBalance?: number;
+        totalAdded?: number;
+        totalPaid?: number;
+      };
     } = {
-      $set: { status }
+      $set: { status },
+      $inc: {}
     };
-      if (transactionType === "Add Money") {
-        updateDoc.$inc = { currentBalance: parseFloat(requestAmount) };
-      }
-      if (transactionType === "Pay Money") {
-        updateDoc.$inc = { currentBalance: -parseFloat(requestAmount) };
-      }
+
+     const amount = parseFloat(requestAmount);
+
+    if (transactionType === "Add Money") {
+      updateDoc.$inc.currentBalance = amount;
+      updateDoc.$inc.totalAdded = amount;
+    } 
+    else if (transactionType === "Pay Money") {
+      updateDoc.$inc.currentBalance = -amount;
+      updateDoc.$inc.totalPaid = amount;
+    }
+
       const result = await transactionCollection.updateOne(query, updateDoc);
       res.send(result);
     });
