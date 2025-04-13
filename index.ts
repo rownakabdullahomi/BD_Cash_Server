@@ -2,25 +2,22 @@ require("dotenv").config();
 const express = require("express");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
-import { Request, Response, NextFunction  } from "express";
+import { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 
 const cors = require("cors");
 import jwt, { VerifyErrors } from "jsonwebtoken";
-const cookieParser = require('cookie-parser');
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
 const port = process.env.PORT || 5000;
 
 const corsOptions = {
-  origin: [
-      'http://localhost:5173',
-      
-      ],
+  origin: ["http://localhost:5173"],
   credentials: true,
   optionalSuccessStatus: 200,
-}
+};
 
 //  Middleware
 app.use(cors(corsOptions));
@@ -38,26 +35,23 @@ const client = new MongoClient(uri, {
   },
 });
 
-
 // verifyToken
 const verifyToken = (req: Request, res: Response, next: NextFunction) => {
-  const token = req.cookies?.token
+  const token = req.cookies?.token;
   // console.log(token);
-  if (!token) return res.status(401).send({ message: 'unauthorized access' })
-  jwt.verify(token, process.env.SECRET_KEY as string, (err: VerifyErrors | null, decoded: any) => {
+  if (!token) return res.status(401).send({ message: "unauthorized access" });
+  jwt.verify(
+    token,
+    process.env.SECRET_KEY as string,
+    (err: VerifyErrors | null, decoded: any) => {
       if (err) {
-          return res.status(401).send({ message: 'unauthorized access' })
+        return res.status(401).send({ message: "unauthorized access" });
       }
       (req as Request & { user?: any }).user = decoded;
-  })
-  next()
-}
-
-
-
-
-
-
+    }
+  );
+  next();
+};
 
 async function run() {
   try {
@@ -65,45 +59,38 @@ async function run() {
     // await client.connect();
 
     const userCollection = client.db("bd_cash").collection("users");
-    const transactionCollection = client.db("bd_cash").collection("transactions");
+    const transactionCollection = client
+      .db("bd_cash")
+      .collection("transactions");
 
-
-      // Generate jwt
-      app.post('/jwt', async (req: Request, res: Response) => {
-        const email = req.body
-        // create token
-        const token = jwt.sign(email, process.env.SECRET_KEY as string, {
-            expiresIn: '5d',
+    // Generate jwt
+    app.post("/jwt", async (req: Request, res: Response) => {
+      const email = req.body;
+      // create token
+      const token = jwt.sign(email, process.env.SECRET_KEY as string, {
+        expiresIn: "5d",
+      });
+      // console.log(token)
+      // res.send(token)
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
-        // console.log(token)
-        // res.send(token)
-        res
-            .cookie('token', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            })
-            .send({ success: true })
-    })
+        .send({ success: true });
+    });
 
     // Remove cookie from browser when logout
-    app.get('/logout', async (req: Request, res: Response) => {
-        res
-            .clearCookie('token', {
-                maxAge: 0,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            })
-            .send({ success: true })
-    })
-
-
-
-
-
-
-
-
+    app.get("/logout", async (req: Request, res: Response) => {
+      res
+        .clearCookie("token", {
+          maxAge: 0,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
 
     // Users APIs
     app.post("/users", async (req: Request, res: Response) => {
@@ -142,6 +129,15 @@ async function run() {
       const result = await transactionCollection.find().toArray();
       res.send(result);
     });
+
+    // get all transactions of a user
+    app.get("/all/transactions/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const query = { createdBy: email };
+      const result = await transactionCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // get a transaction by id
     app.get("/transaction/:id", async (req: Request, res: Response) => {
       const id = req.params.id;
@@ -150,44 +146,52 @@ async function run() {
       res.send(result);
     });
     // get the latest transaction by email
-    app.get("/latest/transaction/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const query = { createdBy : email };
-      const result = await transactionCollection.findOne(query, {
-        sort: { _id: -1 }, // or `_id: -1` 
-      });
-      res.send(result);
-    });
+    app.get(
+      "/latest/transaction/:email",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const query = { createdBy: email };
+        const result = await transactionCollection.findOne(query, {
+          sort: { _id: -1 }, // or `_id: -1`
+        });
+        res.send(result);
+      }
+    );
 
     app.patch("/transaction/:id", async (req: Request, res: Response) => {
       const id = req.params.id;
-      const { requestAmount, transactionType, currentBalance, totalAdded, totalPaid, status } = req.body;
+      const {
+        requestAmount,
+        transactionType,
+        currentBalance,
+        totalAdded,
+        totalPaid,
+        status,
+      } = req.body;
       const query = { _id: new ObjectId(id) };
-      
-     
-    // Define the base update operation
-    const updateDoc: {
-      $set: { status: string };
-      $inc: {
-        currentBalance?: number;
-        totalAdded?: number;
-        totalPaid?: number;
+
+      // Define the base update operation
+      const updateDoc: {
+        $set: { status: string };
+        $inc: {
+          currentBalance?: number;
+          totalAdded?: number;
+          totalPaid?: number;
+        };
+      } = {
+        $set: { status },
+        $inc: {},
       };
-    } = {
-      $set: { status },
-      $inc: {}
-    };
 
-     const amount = parseFloat(requestAmount);
+      const amount = parseFloat(requestAmount);
 
-    if (transactionType === "Add Money") {
-      updateDoc.$inc.currentBalance = amount;
-      updateDoc.$inc.totalAdded = amount;
-    } 
-    else if (transactionType === "Pay Money") {
-      updateDoc.$inc.currentBalance = -amount;
-      updateDoc.$inc.totalPaid = amount;
-    }
+      if (transactionType === "Add Money") {
+        updateDoc.$inc.currentBalance = amount;
+        updateDoc.$inc.totalAdded = amount;
+      } else if (transactionType === "Pay Money") {
+        updateDoc.$inc.currentBalance = -amount;
+        updateDoc.$inc.totalPaid = amount;
+      }
 
       const result = await transactionCollection.updateOne(query, updateDoc);
       res.send(result);
