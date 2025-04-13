@@ -6,27 +6,18 @@ import { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 
 const cors = require("cors");
-import jwt, { VerifyErrors } from "jsonwebtoken";
-const cookieParser = require("cookie-parser");
+import jwt from "jsonwebtoken";
+
 
 const app = express();
 
 const port = process.env.PORT || 5000;
 
-const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "https://bd-cash-676cc.web.app",
-    "https://bd-cash-676cc.firebaseapp.com",
-  ],
-  credentials: true,
-  optionalSuccessStatus: 200,
-};
 
 //  Middleware
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
-app.use(cookieParser());
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.d3h8n.mongodb.net/?appName=Cluster0`;
 
@@ -51,39 +42,24 @@ async function run() {
 
     // Generate jwt
     app.post("/jwt", async (req: Request, res: Response) => {
-      const email = req.body;
-      // create token
-      const token = jwt.sign(email, process.env.SECRET_KEY as string, {
-        expiresIn: "5d",
-      });
-      // console.log(token)
-      // res.send(token)
-      res
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-        })
-        .send({ success: true });
+      const user = req.body;
+      const token = jwt.sign(user, process.env.SECRET_KEY as string, { expiresIn: '7d' });
+      res.send({ token });
     });
 
     // verifyToken
     const verifyToken = (req: Request, res: Response, next: NextFunction) => {
-      const token = req.cookies?.token;
-      // console.log(token);
-      if (!token)
-        return res.status(401).send({ message: "unauthorized access" });
-      jwt.verify(
-        token,
-        process.env.SECRET_KEY as string,
-        (err: VerifyErrors | null, decoded: any) => {
-          if (err) {
-            return res.status(401).send({ message: "unauthorized access" });
-          }
-          (req as Request & { user?: any }).user = decoded;
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.SECRET_KEY as string, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: 'unauthorized access' })
         }
-      );
-      next();
+        (req as any).decoded = decoded;
+        next();
+      })
     };
 
     // Remove cookie from browser when logout
@@ -264,7 +240,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req: Request, res: Response) => {
-  res.send("BD_Cash Node + TypeScript Server is running!");
+  res.send("BD_Cash ---> Node + TypeScript Server is running!");
 });
 
 app.listen(port, () => {
