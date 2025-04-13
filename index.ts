@@ -35,24 +35,6 @@ const client = new MongoClient(uri, {
   },
 });
 
-// verifyToken
-const verifyToken = (req: Request, res: Response, next: NextFunction) => {
-  const token = req.cookies?.token;
-  // console.log(token);
-  if (!token) return res.status(401).send({ message: "unauthorized access" });
-  jwt.verify(
-    token,
-    process.env.SECRET_KEY as string,
-    (err: VerifyErrors | null, decoded: any) => {
-      if (err) {
-        return res.status(401).send({ message: "unauthorized access" });
-      }
-      (req as Request & { user?: any }).user = decoded;
-    }
-  );
-  next();
-};
-
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -81,6 +63,25 @@ async function run() {
         .send({ success: true });
     });
 
+    // verifyToken
+    const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+      const token = req.cookies?.token;
+      // console.log(token);
+      if (!token)
+        return res.status(401).send({ message: "unauthorized access" });
+      jwt.verify(
+        token,
+        process.env.SECRET_KEY as string,
+        (err: VerifyErrors | null, decoded: any) => {
+          if (err) {
+            return res.status(401).send({ message: "unauthorized access" });
+          }
+          (req as Request & { user?: any }).user = decoded;
+        }
+      );
+      next();
+    };
+
     // Remove cookie from browser when logout
     app.get("/logout", async (req: Request, res: Response) => {
       res
@@ -108,30 +109,30 @@ async function run() {
     });
 
     // get a specific user role
-    app.get("/user/role/:email", async (req: Request, res: Response) => {
+    app.get("/user/role/:email", verifyToken, async (req: Request, res: Response) => {
       const email = req.params.email;
       const query = { email };
       const result = await userCollection.findOne(query);
       res.send(result);
     });
 
-    app.post("/add-money-request", async (req: Request, res: Response) => {
+    app.post("/add-money-request", verifyToken, async (req: Request, res: Response) => {
       const result = await transactionCollection.insertOne(req.body);
       res.send(result);
     });
-    app.post("/pay-money-request", async (req: Request, res: Response) => {
+    app.post("/pay-money-request", verifyToken, async (req: Request, res: Response) => {
       const result = await transactionCollection.insertOne(req.body);
       res.send(result);
     });
 
     // get all transactions
-    app.get("/transactions", async (req: Request, res: Response) => {
+    app.get("/transactions", verifyToken, async (req: Request, res: Response) => {
       const result = await transactionCollection.find().toArray();
       res.send(result);
     });
 
     // get all transactions of a user
-    app.get("/all/transactions/:email", async (req: Request, res: Response) => {
+    app.get("/all/transactions/:email", verifyToken, async (req: Request, res: Response) => {
       const email = req.params.email;
       const query = { createdBy: email };
       const result = await transactionCollection.find(query).toArray();
@@ -139,7 +140,7 @@ async function run() {
     });
 
     // get a transaction by id
-    app.get("/transaction/:id", async (req: Request, res: Response) => {
+    app.get("/transaction/:id", verifyToken, async (req: Request, res: Response) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await transactionCollection.findOne(query);
@@ -147,7 +148,7 @@ async function run() {
     });
     // get the latest transaction by email
     app.get(
-      "/latest/transaction/:email",
+      "/latest/transaction/:email", verifyToken,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const query = { createdBy: email };
@@ -158,7 +159,7 @@ async function run() {
       }
     );
 
-    app.patch("/transaction/:id", async (req: Request, res: Response) => {
+    app.patch("/transaction/:id", verifyToken, async (req: Request, res: Response) => {
       const id = req.params.id;
       const {
         requestAmount,
