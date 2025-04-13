@@ -108,47 +108,92 @@ async function run() {
       }
     });
 
-    // get a specific user role
-    app.get("/user/role/:email", verifyToken, async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const query = { email };
-      const result = await userCollection.findOne(query);
+    // get all users
+    app.get("/all/users", verifyToken, async (req: Request, res: Response) => {
+      const type = "user";
+      const query = { type };
+      const result = await userCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.post("/add-money-request", verifyToken, async (req: Request, res: Response) => {
-      const result = await transactionCollection.insertOne(req.body);
-      res.send(result);
-    });
-    app.post("/pay-money-request", verifyToken, async (req: Request, res: Response) => {
-      const result = await transactionCollection.insertOne(req.body);
-      res.send(result);
-    });
+    // delete a user
+    app.delete(
+      "/delete/user/:email",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const query = { email };
+        const result = await userCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
+
+    // get a specific user role
+    app.get(
+      "/user/role/:email",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const query = { email };
+        const result = await userCollection.findOne(query);
+        res.send(result);
+      }
+    );
+
+    app.post(
+      "/add-money-request",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const result = await transactionCollection.insertOne(req.body);
+        res.send(result);
+      }
+    );
+    app.post(
+      "/pay-money-request",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const result = await transactionCollection.insertOne(req.body);
+        res.send(result);
+      }
+    );
 
     // get all transactions
-    app.get("/transactions", verifyToken, async (req: Request, res: Response) => {
-      const result = await transactionCollection.find().toArray();
-      res.send(result);
-    });
+    app.get(
+      "/transactions",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const result = await transactionCollection.find().toArray();
+        res.send(result);
+      }
+    );
 
     // get all transactions of a user
-    app.get("/all/transactions/:email", verifyToken, async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const query = { createdBy: email };
-      const result = await transactionCollection.find(query).toArray();
-      res.send(result);
-    });
+    app.get(
+      "/all/transactions/:email",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const query = { createdBy: email };
+        const result = await transactionCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
     // get a transaction by id
-    app.get("/transaction/:id", verifyToken, async (req: Request, res: Response) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await transactionCollection.findOne(query);
-      res.send(result);
-    });
+    app.get(
+      "/transaction/:id",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await transactionCollection.findOne(query);
+        res.send(result);
+      }
+    );
     // get the latest transaction by email
     app.get(
-      "/latest/transaction/:email", verifyToken,
+      "/latest/transaction/:email",
+      verifyToken,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const query = { createdBy: email };
@@ -159,44 +204,48 @@ async function run() {
       }
     );
 
-    app.patch("/transaction/:id", verifyToken, async (req: Request, res: Response) => {
-      const id = req.params.id;
-      const {
-        requestAmount,
-        transactionType,
-        currentBalance,
-        totalAdded,
-        totalPaid,
-        status,
-      } = req.body;
-      const query = { _id: new ObjectId(id) };
+    app.patch(
+      "/transaction/:id",
+      verifyToken,
+      async (req: Request, res: Response) => {
+        const id = req.params.id;
+        const {
+          requestAmount,
+          transactionType,
+          currentBalance,
+          totalAdded,
+          totalPaid,
+          status,
+        } = req.body;
+        const query = { _id: new ObjectId(id) };
 
-      // Define the base update operation
-      const updateDoc: {
-        $set: { status: string };
-        $inc: {
-          currentBalance?: number;
-          totalAdded?: number;
-          totalPaid?: number;
+        // Define the base update operation
+        const updateDoc: {
+          $set: { status: string };
+          $inc: {
+            currentBalance?: number;
+            totalAdded?: number;
+            totalPaid?: number;
+          };
+        } = {
+          $set: { status },
+          $inc: {},
         };
-      } = {
-        $set: { status },
-        $inc: {},
-      };
 
-      const amount = parseFloat(requestAmount);
+        const amount = parseFloat(requestAmount);
 
-      if (transactionType === "Add Money") {
-        updateDoc.$inc.currentBalance = amount;
-        updateDoc.$inc.totalAdded = amount;
-      } else if (transactionType === "Pay Money") {
-        updateDoc.$inc.currentBalance = -amount;
-        updateDoc.$inc.totalPaid = amount;
+        if (transactionType === "Add Money") {
+          updateDoc.$inc.currentBalance = amount;
+          updateDoc.$inc.totalAdded = amount;
+        } else if (transactionType === "Pay Money") {
+          updateDoc.$inc.currentBalance = -amount;
+          updateDoc.$inc.totalPaid = amount;
+        }
+
+        const result = await transactionCollection.updateOne(query, updateDoc);
+        res.send(result);
       }
-
-      const result = await transactionCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+    );
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
